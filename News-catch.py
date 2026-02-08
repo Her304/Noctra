@@ -1,15 +1,24 @@
 import psycopg2
 from newscatcher import Newscatcher
 from datetime import datetime
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+from openai import OpenAI
+
+#load the api keys from .env
+load_dotenv()
+client = OpenAI()
+
 
 #connect to database
 conn = psycopg2.connect(
-    dbname="news_db",
-    user="hercules",
-    password="",
-    host="localhost",
-    port="5432"
-)
+        dbname="news_db",
+        user="hercules",
+        password="",
+        host="localhost",
+        port="5432"
+    )
 
 cur = conn.cursor()
 
@@ -17,15 +26,17 @@ cur = conn.cursor()
 nc = Newscatcher(website = 'cnbc.com', topic = "business")
 results = nc.get_news()
 
-# results.keys()
-# 'url', 'topic', 'language', 'country', 'articles'
+    # results.keys()
+    # 'url', 'topic', 'language', 'country', 'articles'
 
 # Get the articles
 articles = results['articles']
 
+#dictionary for today news, for storing top 10 business news from all the news
 today_news = {}
 
 for i in range(0,10):
+    #format the date
     p_date = articles[i].get('published_parsed')
     if p_date:
         p_date= datetime(*p_date[:6])
@@ -33,17 +44,27 @@ for i in range(0,10):
         p_date= None
     today_news[f"{articles[i]['title']}"] = [f"{articles[i]['summary']}", f"{articles[i]['link']}", p_date]
 
-#title : [summary, full url, date]
+    #title : [summary, full url, date]
 
 p_news = today_news.items()
 
+#save all the news into database
 for i in p_news:
     title = i[0]
     summary= i[1][0]
     url=i[1][1]
     date=i[1][2]
+        
+    #ask ai to generate the summary
+    ai_response = client.responses.create(
+                model="gpt-4.1-nano",
+                input= f"Analyze this news as a business professor: {title}. Summary: {summary}. Please apply different model, including but not limited on: SWOT, key success factors, PEST, diamond-E etc. limited you response with 300 words and divide different part of model, no any greeting words, thanks for help "
+            )
+    #abstract the text from all the data
+    analysis_text = ai_response.output_text
 
-    cur.execute("""INSERT INTO news_articles (title, summary, url, published_date) VALUES (%s, %s, %s, %s)""", (title, summary, url, date))
+    #save all the info into db
+    cur.execute("""INSERT INTO news_articles (title, summary, url, published_date, analysis) VALUES (%s, %s, %s, %s, %s)""", (title, summary, url, date, analysis_text))
     print(f"saved:{title}")
 
 conn.commit()
