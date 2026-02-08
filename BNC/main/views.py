@@ -34,7 +34,7 @@ def news(response):
         if analysis_text:
             html_analysis = markdown.markdown(analysis_text)
         else:
-            html_analysis = "analysis is pending..."
+            html_analysis = "We apologise for missing the analysis"
 
         today_news[title] = [summary, url, date, html_analysis]
     

@@ -5,14 +5,24 @@ News
 {% endblock %}
 
 {% block content %}
-<h1>news</h1>
-{% for title, details in today_news.items %}
-<h2>{{title}}</h2>
-<p>summary: {{details.0}}</p>
-<p>analysis: <br>{{details.3|safe}}</p>
-<p>url: {{details.1}}</p>
-<p>date: {{details.2}}</p>
+<h3 class="google-sans-flex-page-title">Top 10 business news analysis:</h3>
 <br>
+
+{% for title, details in today_news.items %}
+    <div id="title-{{ forloop.counter }}" class="news-item">  
+        <h2 id="item-{{ forloop.counter }}">
+            <a href="#item-{{ forloop.counter }}" style="color: inherit; text-decoration: none;">
+                {{ title }}
+            </a>
+        </h2>
+        <h3>summary: </h3>
+        <p>{{details.0}}</p>
+        <h3>analysis: </h3>
+        <p>{{details.3|safe}}</p>
+        <a href="{{details.1}}">full news</a>
+        <p>date: {{details.2}}</p>
+        <br>
+    </div>
 {% endfor %}
 
 {% endblock %}

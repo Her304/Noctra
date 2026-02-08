@@ -10,15 +10,120 @@
     "GRAD" 100,
     "ROND" 0;
   color: #6b00ed;
-  padding-left: 2rem;
-  padding-top: 1.5rem;
+  padding-left: 1rem;
+  padding-top: 1rem;
+}
+
+.google-sans-flex-page-title {
+  font-family: "Google Sans Flex", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 500;
+  font-style: normal;
+  font-variation-settings:
+    "slnt" 0,
+    "wdth" 150,
+    "GRAD" 100,
+    "ROND" 0;
+  color: #6b00ed;
+}
+
+@media screen and (min-width: 320px) {
+    .google-sans-flex-title {
+      font-size: calc(20px + 8 * ((100vw - 320px) / 680));
+    }
+}
+
+
+.outfit-bar {
+  font-family: "Outfit", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 500;
+  font-style: normal;
+  padding-left: 1rem;
+  padding-top: 1rem;
+}
+
+hr {
+  margin-top: 0rem;
 }
 
 .google-sans-flex-title:hover {
-  color: #53179c;
+  color: #53179c !important;
+  text-decoration: none !important;
+}
+.a{
+  padding-left: 2rem !important;
+  padding-right: 2rem !important;
 }
 
-.a {
-  padding-left: 2rem;
-  padding-right: 2rem;
+html{
+  scroll-behavior: smooth;
+}
+
+.material-symbols-outlined {
+  padding-top: 1rem;
+  font-variation-settings:
+  'FILL' 0,
+  'wght' 400,
+  'GRAD' 0,
+  'opsz' 24
+  
+}
+
+.navbar-toggler:focus,
+.navbar-toggler:active,
+.navbar-toggler-icon:focus {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.outfit-bar:hover{
+  color: #6b00ed !important;
+}
+
+.navbar-brand, .navbar-brand:hover {
+  text-decoration: none;
+}
+
+.news-item {
+  scroll-margin-top: 80px;
+  margin-bottom: 50px;
+}
+.footer-section {
+    padding: 60px 0;
+    background-color: #fff;
+    border-top: 1px solid #eee; 
+}
+
+.footer-links li a, .footer-social li a {
+    color: #333;
+    font-family: "Outfit", sans-serif;
+    text-decoration: none;
+    transition: 0.3s;
+    font-size: 0.9rem;
+}
+
+.footer-links li a:hover, .footer-social li a:hover {
+    color: #6b00ed;
+}
+
+.social-title {
+    font-family: "Outfit", sans-serif;
+    font-weight: 600;
+    margin-bottom: 15px;
+}
+
+.list-inline-item {
+    display: inline-block;
+    margin-right: 15px;
+    margin-left: 15px;
+}
+
+.footer-logo a, .footer-logo a:hover {
+    text-decoration: none !important;
+}
+
+/* Ensure the title inside also stays clean */
+.footer-logo a .google-sans-flex-title {
+    text-decoration: none !important;
 }

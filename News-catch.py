@@ -54,18 +54,32 @@ for i in p_news:
     summary= i[1][0]
     url=i[1][1]
     date=i[1][2]
-        
-    #ask ai to generate the summary
-    ai_response = client.responses.create(
-                model="gpt-4.1-nano",
-                input= f"Analyze this news as a business professor: {title}. Summary: {summary}. Please apply different model, including but not limited on: SWOT, key success factors, PEST, diamond-E etc. limited you response with 300 words and divide different part of model, no any greeting words, thanks for help "
-            )
-    #abstract the text from all the data
-    analysis_text = ai_response.output_text
+    
+    analysis_text = None
+    retries = 0
+    max_retries = 4
 
-    #save all the info into db
+    #ask ai to gen summary and save it
+    while analysis_text is None and retries < max_retries:
+        #ask ai to generate the summary
+        ai_response = client.responses.create(
+                    model="gpt-4.1-nano",
+                    input= f"Analyze this news as a business professor: {title}. Summary: {summary}. Please apply different model, including but not limited on: SWOT, key success factors, PEST, diamond-E etc. limited you response with 300 words and divide different part of model, no any greeting words, thanks for help "
+                )
+        #abstract the text from all the data
+        analysis_text = ai_response.output_text
+        retries += 1
+        if not analysis_text:
+            print(f"analysis is not working, trying the {retries+1} times")
+
+
+    #save all the info into db    
     cur.execute("""INSERT INTO news_articles (title, summary, url, published_date, analysis) VALUES (%s, %s, %s, %s, %s)""", (title, summary, url, date, analysis_text))
-    print(f"saved:{title}")
+    if analysis_text:
+        print(f"saved:{title}")
+    else:
+        print(f"fail to anaylsis{title}")
+        
 
 conn.commit()
 cur.close()
