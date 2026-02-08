@@ -3,7 +3,7 @@ from django.http import HttpResponse, HttpResponseRedirect
 import psycopg2
 
 def home(response):
-    return render(response, "layout.html",{})
+    return render(response, "home.html",{})
 
 def news(response):
     conn = psycopg2.connect(
