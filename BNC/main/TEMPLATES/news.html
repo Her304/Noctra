@@ -1,0 +1,7 @@
+<h1>news</h1>
+{% for title, details in today_news.items %}
+<h2>{{title}}</h2>
+<p>summary: {{details.0}}</p>
+<p>url: {{details.1}}</p>
+<p>date: {{details.2}}</p>
+{% endfor %}
