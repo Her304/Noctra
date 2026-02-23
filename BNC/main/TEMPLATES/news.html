@@ -1,28 +1,58 @@
 {% extends "layout.html" %}
 
-{% block title%}
-News
-{% endblock %}
+{% block title %}News Analysis{% endblock %}
 
 {% block content %}
-<h3 class="google-sans-flex-page-title">Top 10 business news analysis:</h3>
-<br>
 
-{% for title, details in today_news.items %}
-    <div id="title-{{ forloop.counter }}" class="news-item">  
-        <h2 id="item-{{ forloop.counter }}">
-            <a href="#item-{{ forloop.counter }}" style="color: inherit; text-decoration: none;">
-                {{ title }}
-            </a>
-        </h2>
-        <h3>summary: </h3>
-        <p>{{details.0}}</p>
-        <h3>analysis: </h3>
-        <p>{{details.3|safe}}</p>
-        <a href="{{details.1}}">full news</a>
-        <p>date: {{details.2}}</p>
-        <br>
+<!-- ======  PAGE HEADER  ====== -->
+<div class="news-page-header">
+    <div class="container">
+        <h1 class="google-sans-flex-page-title">Top 10 Business News — Analysis</h1>
+        <p>Today's most important stories, broken down through strategic business frameworks.</p>
     </div>
-{% endfor %}
+</div>
+
+<!-- ======  NEWS LIST  ====== -->
+<div class="news-list">
+
+    {% for title, details in today_news.items %}
+    <article id="title-{{ forloop.counter }}" class="news-card">
+
+        <!-- Number badge -->
+        <div class="news-number">{{ forloop.counter }}</div>
+
+        <!-- Title -->
+        <a href="#title-{{ forloop.counter }}" class="news-card-title">
+            {{ title }}
+        </a>
+
+        <!-- Summary block -->
+        <div class="news-text-block">
+            <span class="badge-label badge-summary">Summary</span>
+            <p>{{ details.0 }}</p>
+        </div>
+
+        <!-- Analysis block -->
+        <div class="news-text-block">
+            <span class="badge-label badge-analysis">Analysis</span>
+            <div>{{ details.3|safe }}</div>
+        </div>
+
+        <!-- Meta row -->
+        <div class="news-card-meta">
+            <a href="{{ details.1 }}" target="_blank" rel="noopener" class="btn-source">
+                <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.7rem;"></i>
+                Read Full Article
+            </a>
+            <span class="news-date">
+                <i class="fa-regular fa-calendar" style="font-size:0.75rem;"></i>
+                {{ details.2 }}
+            </span>
+        </div>
+
+    </article>
+    {% endfor %}
+
+</div>
 
 {% endblock %}

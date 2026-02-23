@@ -43,4 +43,8 @@ def news(response):
     
     return render(response, "news.html", {"today_news":today_news})
 
+def error_404(request, exception):
+    return render(request, "404.html", status=404)
+
+
 

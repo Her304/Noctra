@@ -64,7 +64,7 @@ for i in p_news:
         #ask ai to generate the summary
         ai_response = client.responses.create(
                     model="gpt-4.1-nano",
-                    input= f"Analyze this news as a business professor: {title}. Summary: {summary}. Please apply different model, including but not limited on: SWOT, key success factors, PEST, diamond-E etc. limited you response with 300 words and divide different part of model, no any greeting words, thanks for help "
+                    input= f"Analyze this news as a business professor: {title}. Summary: {summary}. Please apply as more business model as you can, including but not limited on: SWOT, key success factors, PEST, diamond-E etc. limited your each business model analysis within 300 words and divide different part of model, no any greeting words, thanks for help "
                 )
         #abstract the text from all the data
         analysis_text = ai_response.output_text
