@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: news_db
+      POSTGRES_USER: hercules
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hercules -d news_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    command: python BNC/manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgres://hercules:password@db:5432/news_db
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      DEBUG: "True"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  crawler:
+    build: .
+    command: python News-catch.py
+    volumes:
+      - .:/app
+    environment:
+      DB_NAME: news_db
+      DB_USER: hercules
+      DB_PASS: password
+      DB_HOST: db
+      DB_PORT: 5432
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

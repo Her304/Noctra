@@ -26,27 +26,21 @@
             {{ title }}
         </a>
 
-        <!-- Summary block -->
-        <div class="news-text-block">
-            <span class="badge-label badge-summary">Summary</span>
-            <p>{{ details.0 }}</p>
-        </div>
-
         <!-- Analysis block -->
         <div class="news-text-block">
             <span class="badge-label badge-analysis">Analysis</span>
-            <div>{{ details.3|safe }}</div>
+            <div>{{ details.2|safe }}</div>
         </div>
 
         <!-- Meta row -->
         <div class="news-card-meta">
-            <a href="{{ details.1 }}" target="_blank" rel="noopener" class="btn-source">
+            <a href="{{ details.0 }}" target="_blank" rel="noopener" class="btn-source">
                 <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.7rem;"></i>
                 Read Full Article
             </a>
             <span class="news-date">
                 <i class="fa-regular fa-calendar" style="font-size:0.75rem;"></i>
-                {{ details.2 }}
+                {{ details.1 }}
             </span>
         </div>
 
