@@ -77,14 +77,11 @@
     python News-catch.py
     ```
 
-## Future Improvements
-- [ ] User authentication & personalized news feeds
-- [ ] Keyword/topic filtering and alerts
-- [ ] Visualization of trends (charts, word clouds)
-- [ ] Support for multiple LLMs
-- [ ] Caching layer for news & analysis results
-
 ## Acknowledgments
-- **Google News RSS** — Reliable source for news feeds.
+- **Google News RSS** — Reliable tool for catching news feeds.
+- **CNBC** — Reliable source for news feeds.
 - **OpenAI** — For providing powerful language models.
 - **Django** — For the robust web framework.
+
+# Websites Link:
+https://noc-tra.cc/
