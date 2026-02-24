@@ -78,7 +78,7 @@
     ```
 
 ## Acknowledgments
-- **Google News RSS** — Reliable tool for catching news feeds.
+- **Google News RSS** — Reliable tool for providing news feeds.
 - **CNBC** — Reliable source for news feeds.
 - **OpenAI** — For providing powerful language models.
 - **Django** — For the robust web framework.
