@@ -78,7 +78,7 @@ def fetch_gdelt_events(query, limit, max_retries=3):
             
     return []
 
-query = "(business OR market) (domain:cnbc.com OR domain:reuters.com) sourcelang:english"
+query = "(business OR market) (domain:cnbc.com) sourcelang:english"
 limit = 20
 events = fetch_gdelt_events(query, limit)
 

@@ -12,6 +12,9 @@ from django.db.models import Q
 from bs4 import BeautifulSoup
 import trafilatura
 from openai import OpenAI
+from django.utils import timezone
+
+date = timezone.now()
 
 # Add the project root and backend directory to sys.path
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -108,7 +111,7 @@ def fetch_html():
                 
                 # Using standard chat completions API
                 response = client.chat.completions.create(
-                    model="gpt-4o-mini",
+                    model="gpt-5.4-mini",
                     messages=[
                         {"role": "system", "content": "You are a senior business analyst."},
                         {"role": "user", "content": query}
