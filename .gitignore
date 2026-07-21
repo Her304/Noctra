@@ -1,3 +1,9 @@
 .DS_Store
 .env
 venv/
+
+start_local.sh
+google-cloud-sdk/
+google-cloud-cli-darwin-arm.tar.gz
+__pycache__/
+*.pyc

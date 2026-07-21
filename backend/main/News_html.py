@@ -1,17 +1,14 @@
-import psycopg2
-from datetime import datetime
+
+from zoneinfo import ZoneInfo
 import os
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
-import requests
-import time
 import django
-from django.utils import timezone
-from django.db.models import Q
-from bs4 import BeautifulSoup
 import trafilatura
 from openai import OpenAI
+
+
 
 # Add the project root and backend directory to sys.path
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -42,97 +39,94 @@ django.setup()
 
 from main.models import NewsArticle
 from datetime import timedelta
+from django.utils import timezone
+from django.db.models import Q
 
-sources = {}
+temp = timezone.now()
+date = temp.astimezone(ZoneInfo("America/Toronto"))
+last_24_hours = date - timedelta(hours=24)
 
-def News_sources():
-    # Articles from the last 24 hours
-    last_24_hours = timezone.now() - timedelta(hours=24)
-    articles = NewsArticle.objects.filter(date__gte=last_24_hours)
-    
-    print(f"Found {articles.count()} articles from the last 24 hours.")
-    for article in articles:
-        # If content already exists, store it; otherwise store the URL as a placeholder
-        sources[article.title] = article.content if article.content else article.url
+# 2. Generate analysis if summary is missing and content is available
+def ai_analysis(content, article):
+    if content and (not article.summary):
+        print(f"  Running AI analysis for: {article.title}")
+        query = f"""
+                    Analyze the following news article and provide a structured business analysis as the senior business analyst at Goldman Sachs and J.P. Morgan.
 
-def fetch_html():
+                    ARTICLE TITLE: {article.title}
+                    ARTICLE CONTENT: {content}
+
+                    Please provide the following analysis in valid JSON format:
+                    1. SWOT Analysis: Strengths, Weaknesses, Opportunities, Threats.
+                    2. PEST Analysis: Political, Economic, Social, and Technological factors.
+                    3. Diamond-E Analysis: Strategy, Resources, Management Preferences, Organization, and Environment.
+                    4. Executive Summary: A 2-sentence summary of why this news matters.
+
+                    Output strictly in JSON format.
+                    """
+                    
+        # Using standard chat completions API
+        response = client.chat.completions.create(
+            model="gpt-5.4-mini",
+            messages=[
+                        {"role": "system", "content": "You are a senior business analyst."},
+                        {"role": "user", "content": query}
+                    ],
+                    response_format={ "type": "json_object" }
+            )
+        analysis = response.choices[0].message.content
+    return analysis
+
+def fetch_html(last_24_hours):
     # Process articles from the last 24 hours where content OR summary is missing
-    last_24_hours = timezone.now() - timedelta(hours=24)
     articles = NewsArticle.objects.filter(date__gte=last_24_hours).filter(
         Q(content__isnull=True) | Q(content="") | Q(summary__isnull=True) | Q(summary="")
     )
-    
-    if not articles.exists():
+    count = articles.count()
+    if not count:
         print("No new articles to process.")
         return
 
-    print(f"Processing {articles.count()} articles for content extraction or AI analysis...")
+    print(f"Processing {count} articles for content extraction or AI analysis...")
     
     for article in articles:
         print(f"Processing: {article.title}")
         try:
             content = article.content
+            new_content = None
+            analysis = None
+            limit = 5
             
             # 1. Fetch content if missing
             if not content:
                 print(f"  Fetching HTML for: {article.url}")
                 downloaded = trafilatura.fetch_url(article.url)
                 if downloaded:
-                    content = trafilatura.extract(downloaded)
-                    if content:
-                        article.content = content
-                        article.save()
-                        print(f"  [SUCCESS] Content saved.")
-                    else:
-                        print(f"  [WARNING] Could not extract content from {article.url}")
+                    new_content = trafilatura.extract(downloaded)                    
                 else:
                     print(f"  [ERROR] Failed to download {article.url}")
 
-            # 2. Generate analysis if summary is missing and content is available
-            if content and (not article.summary):
-                print(f"  Running AI analysis for: {article.title}")
-                query = f"""
-                Analyze the following news article and provide a structured business analysis as the senior business analyst at Goldman Sachs and J.P. Morgan.
+            final_content = new_content or content
 
-                ARTICLE TITLE: {article.title}
-                ARTICLE CONTENT: {content}
-
-                Please provide the following analysis in valid JSON format:
-                1. SWOT Analysis: Strengths, Weaknesses, Opportunities, Threats.
-                2. PEST Analysis: Political, Economic, Social, and Technological factors.
-                3. Diamond-E Analysis: Strategy, Resources, Management Preferences, Organization, and Environment.
-                4. Executive Summary: A 2-sentence summary of why this news matters.
-
-                Output strictly in JSON format.
-                """
-                
-                # Using standard chat completions API
-                response = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[
-                        {"role": "system", "content": "You are a senior business analyst."},
-                        {"role": "user", "content": query}
-                    ],
-                    response_format={ "type": "json_object" }
-                )
-
-                analysis = response.choices[0].message.content
-                if analysis:
-                    article.summary = analysis
-                    article.save()
-                    print(f"  [SUCCESS] Analysis saved.")
-                else:
-                    print(f"  [ERROR] Empty AI response for {article.title}")
-                    
+            while limit > 0 and (analysis is None and final_content):
+                analysis = ai_analysis(final_content, article)
+                limit-=1
+   
+            if final_content and analysis:
+                article.summary = analysis
+                article.content = final_content
+                article.save(update_fields=["summary", "content"])
+                print(f"  [SUCCESS] Analysis saved.")
+                print(f"  [SUCCESS] Content saved.")
+            else:
+                print(f"  error on save the content or analysis on  {article.url}")
+            
+            
         except Exception as e:
             print(f"  [CRITICAL ERROR] Failed to process {article.title}: {e}")
-                    
-        except Exception as e:
-            print(f"  [CRITICAL ERROR] Failed to process {article.url}: {e}")
 
 
-
-News_sources()
-fetch_html()
+if __name__ == "__main__":
+    fetch_html(last_24_hours)
 
 
