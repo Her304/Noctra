@@ -11,17 +11,17 @@ When the user shares code for review or inspection:
 
 ## Project
 
-Noctra is a Decision Engine built on Flask (backend) + React/Vite (frontend). It has three pages — **Apercu** (free news analysis), **Catographic** (paid knowledge graph), and **Enchufar** (paid drag-and-drop analysis workspace). See `plan.md` for the full build plan and `plan.md#database-structure` for the schema.
+Noctra is a Decision Engine built on Django (backend) + React/Vite (frontend). It has three pages — **Apercu** (free news analysis), **Catographic** (paid knowledge graph), and **Enchufar** (paid drag-and-drop analysis workspace).
 
 ## Current State
 
 The project is in early scaffolding. What exists:
-- `app.py` — bare Flask stub, needs to be rebuilt as an app factory
-- `News-catch.py` — GDELT news fetcher, has known errors (see code review in conversation), Django references not yet removed
-- `News_html.py` — HTML scraper + OpenAI analysis, still Django-coupled
+- `backend/` — Django backend with `BNC/` settings and `main/` app
+- `News-catch.py` — GDELT news fetcher, has known errors (see code review in conversation)
+- `News_html.py` — HTML scraper + OpenAI analysis, uses Django ORM
 - `database.db` — empty SQLite file, used as the dev database
 
-The planned folder structure (not yet created) is `backend/` for Flask and `frontend/` for React.
+Folder structure: `backend/` for Django and `frontend/` for React/Vite.
 
 
 ## Environment Variables
@@ -54,15 +54,15 @@ Checks if PostgreSQL is running, starts it via `brew services start postgresql@1
 
 | Task | Model |
 |---|---|
-| SWOT + Diamond E + Executive Summary | GPT-4.1-mini (batch, post-scrape) |
+| SWOT + Diamond E + Executive Summary | gpt-5.4-mini (batch, post-scrape) |
 | Linkage mapping + event predictions | o4-mini, high effort (background) |
 | Custom user analysis (Enchufar) | o4-mini, medium effort (real-time) |
 | Supplementary fetch for weak links | 4o Search Preview (conditional) |
 
 ## Key Architectural Decisions
 
-- **Flask app factory pattern** — `backend/app/__init__.py` creates the app; routes are registered as blueprints per page.
+- **Django backend** — standard Django project under `backend/`; routes are registered per app using Django URL patterns and views.
 - **React Flow over D3** — graph nodes are React components, so SWOT/analysis cards embed directly inside the Catographic graph.
 - **Two-step linkage pipeline** — vector cosine similarity (pgvector, cheap) finds candidates first; o4-mini verifies only those candidates (expensive). Keeps AI costs controlled.
-- **SQLAlchemy for all DB access** — never use raw `sqlite3` in new code; SQLAlchemy abstracts the dev/prod database difference.
+- **Django ORM for all DB access** — never use raw `sqlite3` in new code; the Django ORM abstracts the dev/prod database difference.
 - **Phase 2 stores data in SQLite** — the in-memory/JSON-file approach was dropped in favour of SQLite from the start so Phase 7 is purely a migration, not a rewrite.

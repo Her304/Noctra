@@ -533,6 +533,16 @@ img {
   transition: color var(--transition);
 }
 
+.news-card-title-2 {
+  font-family: var(--font-brand);
+  font-weight: 500;
+  color: var(--midnight);
+  line-height: 1.35;
+  text-decoration: none;
+  display: block;
+  transition: color var(--transition);
+}
+
 .news-card-title:hover {
   color: var(--slate);
   text-decoration: none;
