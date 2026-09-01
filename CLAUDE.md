@@ -11,58 +11,118 @@ When the user shares code for review or inspection:
 
 ## Project
 
-Noctra is a Decision Engine built on Django (backend) + React/Vite (frontend). It has three pages — **Apercu** (free news analysis), **Catographic** (paid knowledge graph), and **Enchufar** (paid drag-and-drop analysis workspace).
+Noctra is a Decision Engine on **Next.js (App Router) + Supabase**, deployed on Vercel's free tier.
+Three pages — **Apercu** (news analysis), **Catographic** (event-relationship graph), and
+**Enchufar** (drag-and-drop analysis workspace, not yet built).
 
-## Current State
+## Architecture
 
-The project is in early scaffolding. What exists:
-- `backend/` — Django backend with `BNC/` settings and `main/` app
-- `News-catch.py` — GDELT news fetcher, has known errors (see code review in conversation)
-- `News_html.py` — HTML scraper + OpenAI analysis, uses Django ORM
-- `database.db` — empty SQLite file, used as the dev database
+Three services, split by what each is good at:
 
-Folder structure: `backend/` for Django and `frontend/` for React/Vite.
+| Component | Runs on | Notes |
+|---|---|---|
+| Next.js app (`app/`, `components/`, `lib/`) | Vercel Hobby | Server Components read Supabase directly; no API routes |
+| Python pipeline (`pipeline/`) | GitHub Actions cron, hourly | Scraping + AI exceeds Vercel's 60s function cap, and trafilatura's lxml is heavy against the bundle limit |
+| Postgres + pgvector | Supabase | `articles`, `linkages`, `article_insights` |
 
-
-## Environment Variables
-
-Create a `.env` file in the project root:
-
-```
-OPENAI_API_KEY=...
-News_catch_api=...      # Newsdata.io API key used in News-catch.py
-```
-
-`python-dotenv` is used — `load_dotenv()` is called at the top of each script.
+The Django backend (`backend/`) and Vite frontend (`frontend/`) are **superseded**. They will be deleted
+once the new Next.js stack is verified live on Vercel. Also delete: `Dockerfile`, `docker-compose.yml`,
+`requirements.txt`, `start_local.sh`, the root `.env`, `google-cloud-sdk/`, and the `google-cloud-cli-darwin-arm.tar.gz` tarball (60 MB).
 
 ## Database
 
-**Dev:** Local PostgreSQL 14 (Homebrew), database `noctra`, user `crawler_service` (trust auth — no password needed). The `NewsArticle` model maps to `news.apercu`.
-**Production:** Google Cloud SQL PostgreSQL at `34.134.226.122`, same user/credentials stored in `.env`.
+Supabase project `rgcdkmilchxbchpotsrs`. Schema lives in `supabase/migrations/`.
 
-The `.env` at the project root controls which DB is active — `DB_HOST`/`CRAWLER_DB_HOST` switch between `localhost` (dev) and the Cloud SQL IP (prod).
+- `articles` — title (unique), url, domain, published_at, content, `summary` **jsonb**, `embedding` vector(1536)
+- `linkages` — source (trigger) → target (ripple effect), similarity, strength, explanation, verified, is_linked
+- `article_insights` — event_summary, predictions jsonb
 
-### Starting dev
+Two RPCs: `match_articles(...)` for vector candidate search, `get_graph(p_days, p_node_limit)`
+which returns React-Flow-shaped `{nodes, edges}` in one round trip.
 
-```bash
-./start_local.sh
+**RLS is enabled with public-SELECT-only policies.** There are no insert/update/delete policies —
+writes are possible solely with the service role key, which bypasses RLS. **Never expose that key to
+the Next.js app.** The pipeline loads it from `pipeline/.env`, which is gitignored. GitHub Actions
+receives it as a secret. The .env.local and root .env files must never contain `SUPABASE_SERVICE_ROLE_KEY`.
+
+Free-tier Supabase projects **pause after ~7 days idle**; the hourly pipeline keeps it awake.
+
+## Environment variables
+
+`.env.local` for Next.js (see `.env.example`):
+```
+NEXT_PUBLIC_SUPABASE_URL=https://rgcdkmilchxbchpotsrs.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...     # anon key only — this reaches the browser
 ```
 
-Checks if PostgreSQL is running, starts it via `brew services start postgresql@14` if not, then launches the Django dev server with the venv activated.
+`pipeline/.env` for the Python pipeline (gitignored, never committed):
+```
+SUPABASE_URL=https://rgcdkmilchxbchpotsrs.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=...         # service role key — bypasses RLS
+OPENAI_API_KEY=...
+```
 
-## AI Models
+GitHub Actions secrets for scheduled runs: same three as `pipeline/.env`. Never prefix these `NEXT_PUBLIC_`.
 
-| Task | Model |
-|---|---|
-| SWOT + Diamond E + Executive Summary | gpt-5.4-mini (batch, post-scrape) |
-| Linkage mapping + event predictions | o4-mini, high effort (background) |
-| Custom user analysis (Enchufar) | o4-mini, medium effort (real-time) |
-| Supplementary fetch for weak links | 4o Search Preview (conditional) |
+## Running
 
-## Key Architectural Decisions
+```bash
+npm run dev              # Next.js on :3000
+npm run build            # production build
+npm run types            # regenerate lib/database.types.ts from the linked project
+```
 
-- **Django backend** — standard Django project under `backend/`; routes are registered per app using Django URL patterns and views.
-- **React Flow over D3** — graph nodes are React components, so SWOT/analysis cards embed directly inside the Catographic graph.
-- **Two-step linkage pipeline** — vector cosine similarity (pgvector, cheap) finds candidates first; o4-mini verifies only those candidates (expensive). Keeps AI costs controlled.
-- **Django ORM for all DB access** — never use raw `sqlite3` in new code; the Django ORM abstracts the dev/prod database difference.
-- **Phase 2 stores data in SQLite** — the in-memory/JSON-file approach was dropped in favour of SQLite from the start so Phase 7 is purely a migration, not a rewrite.
+Pipeline stages are sequential — each consumes what the previous wrote. Use the venv created at `.venv-pipeline`:
+```bash
+.venv-pipeline/bin/python pipeline/fetch_news.py
+.venv-pipeline/bin/python pipeline/analyse_news.py
+.venv-pipeline/bin/python pipeline/embed_articles.py
+.venv-pipeline/bin/python pipeline/discover_linkages.py --days 7 --max-verify 100
+.venv-pipeline/bin/python pipeline/generate_insights.py --top 10
+```
+
+All commands read `pipeline/.env`, which must be filled with credentials before running locally. That file is gitignored; it never reaches the repository.
+
+## AI models
+
+| Task | Model | Where |
+|---|---|---|
+| Executive summary + SWOT + PEST + Diamond-E | `gpt-5.4-mini` | `analyse_news.py` |
+| Linkage verification (graph edges) | `o4-mini`, high effort | `discover_linkages.py` |
+| Event summary + future predictions | `o4-mini`, high effort | `generate_insights.py` |
+| Embeddings | `text-embedding-3-small` (1536d) | `embed_articles.py` |
+
+All model IDs are centralised in `pipeline/common.py` and overridable by env var. They came from
+the design board and have been verified with a live completion call: `gpt-5.4-mini`, `o4-mini`, and `text-embedding-3-small` all work on the account's key. Verify by calling, not with `models.retrieve` -- a deprecated id still retrieves fine and 404s only on use.
+
+## Key architectural decisions
+
+- **Server Components over API routes** — pages query Supabase directly; one less hop, and no
+  hardcoded backend origin to break in production.
+- **React Flow over D3** — nodes are React components, so the analysis card embeds inside the graph.
+- **Force-directed layout (d3-force), not dagre** — clusters emerge from the linkage structure.
+  Dagre imposed strict left-to-right ranks that become an unreadable ribbon past ~20 nodes.
+  Positions settle synchronously in `lib/layout.ts`; ticking inside an animation frame and
+  rebuilding the node array each tick defeats React Flow's measurement pass, which keeps nodes
+  `visibility:hidden` until measured. For the same reason, focus/expansion state is applied by
+  spreading existing nodes through `useNodesState` rather than constructing new node objects.
+- **Linkage discovery is all-pairs, NOT similarity-filtered.** Measured on real data, cosine
+  similarity is anti-correlated with causal insight: the oil-price -> tyre-input-cost link scored
+  0.20 while three unrelated same-sector pairs scored above 0.40. Similarity finds same-topic
+  pairs; causation worth surfacing crosses topics. `--max-verify` is the cost ceiling, and
+  `--min-similarity` is a floor only (default 0.0). This needs a real prefilter again past ~40
+  articles — the promising direction is embedding a causal fingerprint (drivers/exposures)
+  rather than prose.
+- **The verifier must permit second-order effects.** An earlier strict prompt rejected 12/12
+  pairs at strength exactly 0.0. Permitting second-order links while keeping the "same sector"
+  and "siblings of a common cause" guards gives clean separation: 99 rejects at 0.0-0.2,
+  6 links at 0.35-0.6, no overlap. Borderline pairs near 0.35 do vary between runs.
+- **The verifier sees article content, not just the summary.** With summaries alone it rejected
+  oil -> hybrid-vehicle demand, because the Toyota summary never mentions fuel.
+- **Rejected linkages are stored** (`verified=true, is_linked=false`) so the next run does not
+  re-pay for the same negative verdict.
+- **Positions are computed client-side** with dagre, keeping `get_graph` pure data.
+- **Pages degrade rather than fail** — an unreachable Supabase renders an empty state, so a deploy
+  during an outage does not take the site down.
+- **Auth is deferred.** The free/paid limit is `FREE_TIER_NODE_LIMIT` in `lib/config.ts`; when
+  accounts land it becomes a user lookup and nothing else changes.

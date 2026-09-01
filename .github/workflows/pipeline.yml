@@ -1,0 +1,48 @@
+name: pipeline
+
+on:
+  schedule:
+    # Hourly. GitHub delays scheduled runs 5-20 min at peak, which is fine for
+    # news, and disables them after 60 days of repo inactivity -- a commit or a
+    # manual dispatch re-arms them.
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+
+      - run: pip install -r pipeline/requirements.txt
+
+      # Sequential: each stage consumes what the previous one wrote.
+      - name: Fetch headlines
+        run: python pipeline/fetch_news.py
+
+      - name: Analyse articles
+        run: python pipeline/analyse_news.py
+
+      - name: Embed articles
+        run: python pipeline/embed_articles.py
+
+      - name: Discover linkages
+        run: python pipeline/discover_linkages.py --days 7 --max-verify 100
+
+      - name: Generate insights
+        run: python pipeline/generate_insights.py --top 10

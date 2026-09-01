@@ -7,3 +7,17 @@ google-cloud-sdk/
 google-cloud-cli-darwin-arm.tar.gz
 __pycache__/
 *.pyc
+# Next.js
+node_modules/
+.next/
+out/
+next-env.d.ts
+.vercel
+*.tsbuildinfo
+
+# Local env
+.env.local
+
+# Pipeline secrets
+pipeline/.env
+.venv-pipeline/
