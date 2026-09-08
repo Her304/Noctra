@@ -8,8 +8,26 @@ export default function SignInButton({ next }: { next?: string }) {
 
   async function signIn() {
     setBusy(true);
+
+    // Where to land afterwards travels in a cookie, not in the redirect URL.
+    //
+    // Supabase matches redirectTo against the Redirect URLs allowlist as a
+    // whole string, so ".../auth/callback?next=%2Fadmin" does not match an
+    // entry of ".../auth/callback" -- it silently falls back to Site URL, which
+    // in production dumped the user on localhost:3000 with an unused code. The
+    // alternative is a wildcard allowlist entry, which is a worse trade: it
+    // widens what the project will redirect to in order to carry one path.
+    //
+    // Lax is the right SameSite here: the cookie has to survive the top-level
+    // GET that Supabase issues back to /auth/callback, which Lax permits and
+    // Strict would drop.
+    if (next && next.startsWith("/") && !next.startsWith("//")) {
+      const secure = window.location.protocol === "https:" ? "; Secure" : "";
+      document.cookie =
+        `noctra_next=${encodeURIComponent(next)}; Path=/; Max-Age=600; SameSite=Lax${secure}`;
+    }
+
     const callback = new URL("/auth/callback", window.location.origin);
-    if (next) callback.searchParams.set("next", next);
 
     const { error } = await supabaseBrowser().auth.signInWithOAuth({
       provider: "github",
