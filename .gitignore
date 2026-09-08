@@ -21,3 +21,6 @@ next-env.d.ts
 # Pipeline secrets
 pipeline/.env
 .venv-pipeline/
+
+# Claude Code worktrees (embedded repos, must not be tracked)
+.claude/worktrees/
