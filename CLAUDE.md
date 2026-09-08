@@ -28,7 +28,8 @@ Three services, split by what each is good at:
 
 The Django backend (`backend/`) and Vite frontend (`frontend/`) are **superseded**. They will be deleted
 once the new Next.js stack is verified live on Vercel. Also delete: `Dockerfile`, `docker-compose.yml`,
-`requirements.txt`, `start_local.sh`, the root `.env`, `google-cloud-sdk/`, and the `google-cloud-cli-darwin-arm.tar.gz` tarball (60 MB).
+`requirements.txt`, `start_local.sh`, and the root `.env`. The vendored Google Cloud SDK and its
+tarball are already gone — Google Cloud is not part of this stack.
 
 ## Database
 

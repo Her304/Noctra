@@ -40,7 +40,6 @@
     "backend",
     "frontend",
     "pipeline",
-    "venv",
-    "google-cloud-sdk"
+    "venv"
   ]
 }

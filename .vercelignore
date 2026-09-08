@@ -1,8 +1,6 @@
-pipeline/
-backend/
-frontend/
-venv/
-google-cloud-sdk/
-google-cloud-cli-darwin-arm.tar.gz
-supabase/
+/pipeline/
+/backend/
+/frontend/
+/venv/
+/supabase/
 *.py
