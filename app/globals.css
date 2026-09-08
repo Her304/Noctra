@@ -83,7 +83,11 @@ body {
   letter-spacing: -0.006em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
+  /* `clip`, not `hidden`. Both stop sideways overflow, but `hidden` makes the
+     body a scroll container that never actually scrolls, and every view()
+     timeline on the page then resolves against it and sits inactive — no
+     scroll-driven animation runs at all. `clip` creates no scroll container. */
+  overflow-x: clip;
 }
 
 /* Film grain over the whole document — keeps the night from banding and
@@ -251,9 +255,9 @@ img { max-width: 100%; display: block; }
 }
 .nav.scrolled {
   padding-block: 0.85rem;
-  background: rgba(5, 7, 15, 0.72);
-  backdrop-filter: blur(18px) saturate(140%);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  background: rgba(5, 7, 15, 0.93);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
   border-bottom-color: var(--hairline-soft);
 }
 
@@ -434,18 +438,56 @@ img { max-width: 100%; display: block; }
    product's own constellation drawn faintly behind the words.
    ============================================================ */
 
+/* .hero is the track and .hero-stage is the screen. The track is one viewport
+   plus --build tall; the stage is pinned to the top of it and is exactly a
+   viewport, so the reader stands still in front of the mockup for the whole
+   of --build while their scroll scrubs the sequence. --build is 0 by default
+   — the track then collapses onto the stage and the sequence plays on the
+   clock, which is what a browser without scroll timelines gets. */
 .hero {
+  /* Scales the hero's own title sequence — the cards arriving, the question
+     rising and leaving, the linkages drawing. Lives here rather than on
+     .hero-field so the question, which is not inside the svg, can see it. */
+  --beat: 1;
+  --build: 0px;
   position: relative;
-  min-height: 100svh;
+  height: calc(100svh + var(--build));
+}
+
+/* Every gradient, the clip and the flow live on the stage rather than the
+   track: the track is 3 screens tall and a background painted across it
+   would stretch the horizon out of the frame. The clip must not be on the
+   track either — overflow other than `visible` makes a scroll container, and
+   a sticky child of one sticks to a box that never scrolls. */
+.hero-stage {
+  position: sticky;
+  top: 0;
+  height: 100svh;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: 9rem var(--gutter) 0;
+  padding: 7.5rem var(--gutter) 0;
   overflow: hidden;
   background:
     radial-gradient(140% 95% at 50% 108%, rgba(233, 180, 76, 0.16) 0%, transparent 46%),
     radial-gradient(120% 80% at 50% 100%, var(--night-3) 0%, transparent 58%),
     linear-gradient(180deg, var(--ink) 0%, var(--night) 46%, var(--night-2) 100%);
+}
+
+/* A nebula in the upper field, so the sky above the headline is weather
+   rather than empty paint. */
+.hero-stage::before {
+  content: "";
+  position: absolute;
+  inset: -10% -20% auto -20%;
+  height: 70%;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 46% at 22% 30%, rgba(28, 52, 116, 0.55), transparent 70%),
+    radial-gradient(30% 40% at 74% 18%, rgba(45, 63, 128, 0.4), transparent 72%),
+    radial-gradient(24% 32% at 52% 46%, rgba(233, 180, 76, 0.07), transparent 70%);
+  filter: blur(38px);
+  animation: drift 120s linear infinite alternate;
 }
 
 /* Star layers: three sizes at three parallax opacities, drifting. */
@@ -491,38 +533,120 @@ img { max-width: 100%; display: block; }
   50% { opacity: 1; }
 }
 
-/* The constellation SVG — the linkage graph, drawn as sky. */
-.hero-constellation {
+/* ---------- The title sequence ----------
+   From the Keynote mockup, beat for beat: five article cards scatter into
+   the field, the question rises and leaves, four linkages draw themselves
+   between the cards, and the headline answers. --beat scales the whole
+   sequence; nothing else needs touching to make it faster or slower. */
+
+.hero-field {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
-  opacity: 0.5;
 }
-.hero-constellation line {
-  stroke: rgba(233, 180, 76, 0.34);
-  stroke-width: 0.35;
-  stroke-dasharray: 3 3;
-  animation: trace 26s linear infinite;
-}
-.hero-constellation circle {
-  fill: var(--ember-lit);
-  animation: pulse-star 5s ease-in-out infinite;
-}
-.hero-constellation circle:nth-of-type(2n) { animation-delay: 1.3s; }
-.hero-constellation circle:nth-of-type(3n) { animation-delay: 2.6s; }
 
-@keyframes trace {
-  to { stroke-dashoffset: -120; }
+/* Black-on-white in the mockup; here the same rectangles read as unlit
+   article cards in the night field, so they sit under the headline instead
+   of fighting it. */
+.hero-field rect {
+  fill: rgba(22, 41, 94, 0.32);
+  stroke: rgba(246, 244, 239, 0.09);
+  stroke-width: 1.2;
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  animation: card-arrive calc(0.9s * var(--beat)) var(--ease) forwards;
+  animation-delay: calc(var(--i) * 0.09s * var(--beat));
 }
-@keyframes pulse-star {
-  0%, 100% { opacity: 0.4; r: 1.1; }
-  50% { opacity: 1; r: 1.9; }
+
+/* Keynote's "fade and move": one direction for the whole group. */
+@keyframes card-arrive {
+  from { opacity: 0; transform: translate(0, 54px) scale(0.95); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Keynote's Line Draw, which is a dash sweep once pathLength is normalised.
+   The linkages start while the last cards are still landing, then hold at a
+   slow breath so the field is never quite still. */
+.hero-field line {
+  stroke: rgba(233, 180, 76, 0.55);
+  stroke-width: 2;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 7px rgba(233, 180, 76, 0.4));
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation:
+    linkage-draw calc(1.6s * var(--beat)) var(--ease) calc((0.95s + var(--i) * 0.16s) * var(--beat)) forwards,
+    linkage-breathe 9s ease-in-out calc(3.6s * var(--beat)) infinite;
+}
+
+@keyframes linkage-draw {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes linkage-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/* The question, in the mockup's serif, over the space the h1 will occupy.
+   It fades and moves in, holds, then fades and moves out the way the
+   Keynote build does — and the headline arrives as it clears. */
+.hero-stage > .hero-ask {
+  /* inset: 0 covers the stage, which is one screen — so the grid centres the
+     question on the screen itself, over the middle card, where the mockup
+     has it. It used to be a child of .hero-body and centred on that instead,
+     and .hero-body is bottom-anchored above the figures: near enough on a
+     720-tall screen, fourteen points below centre on a 1024-tall one. */
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0 var(--gutter);
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: clamp(1.7rem, 3.6vw, 3.1rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  /* The question is the only thing lit on slide 1, so it carries the full
+     bright rather than the muted half a headline's second clause takes. */
+  color: var(--bright);
+  text-wrap: balance;
+  opacity: 0;
+  animation:
+    ask-in calc(0.75s * var(--beat)) var(--ease) calc(0.3s * var(--beat)) forwards,
+    ask-out calc(0.6s * var(--beat)) var(--ease) calc(1.15s * var(--beat)) forwards;
+}
+
+/* The mockup is a 16:9 stage. Fitted to a phone it collapses into a thin
+   band across the middle of the hero, which is exactly where the buttons
+   are — so on narrow screens the field is enlarged past the edges and lifted
+   behind the headline, and dropped back to texture. */
+@media (max-width: 820px) {
+  .hero-field {
+    opacity: 0.6;
+    transform: scale(1.75) translateY(-13%);
+  }
+  .hero-stage > .hero-ask {
+    font-size: clamp(1.5rem, 7.2vw, 2.4rem);
+    align-content: center;
+  }
+}
+
+@keyframes ask-in {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes ask-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(-20px); }
 }
 
 /* A soft ground haze at the bottom edge, where the meadow glows. */
-.hero::after {
+.hero-stage::after {
   content: "";
   position: absolute;
   left: -10%;
@@ -541,17 +665,21 @@ img { max-width: 100%; display: block; }
   margin-inline: auto;
   width: 100%;
   text-align: center;
-  padding-bottom: 3.5rem;
+  padding-bottom: 2.4rem;
 }
 
+/* "Fade and move" rather than a plain fade, to match the mockup's builds.
+   The headline waits for the question to clear; the eyebrow does not, so
+   the hero is never a blank field. */
 .hero-body > * {
   opacity: 0;
+  transform: translateY(18px);
   animation: rise 0.95s var(--ease) forwards;
 }
-.hero-body > *:nth-child(1) { animation-delay: 0.1s; }
-.hero-body > *:nth-child(2) { animation-delay: 0.22s; }
-.hero-body > *:nth-child(3) { animation-delay: 0.36s; }
-.hero-body > *:nth-child(4) { animation-delay: 0.5s; }
+.hero-body > *:nth-child(1) { animation-delay: 0.15s; }
+.hero-body > *:nth-child(2) { animation-delay: 1.45s; }
+.hero-body > *:nth-child(3) { animation-delay: 1.65s; }
+.hero-body > *:nth-child(4) { animation-delay: 1.82s; }
 
 .hero-eyebrow {
   display: inline-flex;
@@ -567,7 +695,7 @@ img { max-width: 100%; display: block; }
   letter-spacing: 0.17em;
   text-transform: uppercase;
   color: var(--haze);
-  margin-bottom: 2.2rem;
+  margin-bottom: 1.8rem;
 }
 .hero-eyebrow .dot {
   width: 5px;
@@ -583,15 +711,15 @@ img { max-width: 100%; display: block; }
 }
 
 .hero-title {
-  font-size: clamp(2.9rem, 7.6vw, 6.6rem);
-  max-width: 17ch;
+  font-size: clamp(2.4rem, 5.4vw, 4.8rem);
+  max-width: 22ch;
   margin-inline: auto;
 }
 
 .hero-sub {
   max-width: 54ch;
-  margin: 1.9rem auto 0;
-  font-size: clamp(0.98rem, 1.25vw, 1.1rem);
+  margin: 1.5rem auto 0;
+  font-size: clamp(0.95rem, 1.15vw, 1.05rem);
   line-height: 1.7;
   color: var(--haze);
 }
@@ -601,7 +729,7 @@ img { max-width: 100%; display: block; }
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.75rem;
-  margin-top: 2.6rem;
+  margin-top: 2rem;
 }
 
 /* Figures strip pinned inside the hero, hairline-ruled (Solara). */
@@ -615,10 +743,11 @@ img { max-width: 100%; display: block; }
   grid-template-columns: repeat(4, 1fr);
   border-top: 1px solid var(--hairline);
   opacity: 0;
-  animation: rise 0.95s var(--ease) 0.65s forwards;
+  transform: translateY(18px);
+  animation: rise 0.95s var(--ease) 2s forwards;
 }
 .hero-figure {
-  padding: 1.5rem 1.4rem 2.4rem;
+  padding: 1.25rem 1.4rem 1.9rem;
   border-right: 1px solid var(--hairline-soft);
 }
 .hero-figure:last-child { border-right: 0; }
@@ -925,11 +1054,16 @@ img { max-width: 100%; display: block; }
 .split-visual {
   position: relative;
   min-height: 34rem;
-  overflow: hidden;
   background:
     radial-gradient(90% 70% at 30% 20%, rgba(22, 41, 94, 0.95), transparent 62%),
     radial-gradient(80% 80% at 80% 100%, rgba(233, 180, 76, 0.2), transparent 60%),
     var(--ink);
+}
+/* The night is cut to the column; the card over it is not. */
+.split-sky {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
 }
 .split-visual .constellation {
   position: absolute;
@@ -938,8 +1072,9 @@ img { max-width: 100%; display: block; }
   height: 100%;
 }
 .split-visual .constellation line {
-  stroke: rgba(233, 180, 76, 0.45);
-  stroke-width: 0.4;
+  stroke: rgba(233, 180, 76, 0.4);
+  stroke-width: 1.2;
+  stroke-dasharray: 6 8;
 }
 .split-visual .constellation circle { fill: var(--ember-lit); }
 
@@ -1130,18 +1265,22 @@ img { max-width: 100%; display: block; }
   border-top: 1px solid var(--hairline-soft);
   padding-top: 1.5rem;
 }
-.foot-mark span {
-  display: block;
+/* Drawn as SVG so the wordmark lands edge to edge at every width -- a
+   viewport-unit font-size only fits at one breakpoint. */
+.foot-mark svg { display: block; width: 100%; height: auto; }
+.foot-mark text {
   font-family: var(--font-display);
-  font-size: clamp(4.5rem, 19vw, 18rem);
-  line-height: 0.82;
-  letter-spacing: -0.045em;
-  color: transparent;
-  -webkit-text-stroke: 1px rgba(139, 153, 188, 0.34);
-  user-select: none;
-  transition: color 0.8s var(--ease);
+  font-size: 500px;
+  letter-spacing: -0.03em;
+  fill: transparent;
+  stroke: rgba(139, 153, 188, 0.32);
+  stroke-width: 1.4;
+  transition: fill 0.8s var(--ease), stroke 0.8s var(--ease);
 }
-.foot-mark:hover span { color: rgba(233, 180, 76, 0.09); }
+.foot-mark:hover text {
+  fill: rgba(233, 180, 76, 0.08);
+  stroke: rgba(233, 180, 76, 0.4);
+}
 
 .foot-legal {
   max-width: var(--shell);
@@ -1205,6 +1344,44 @@ img { max-width: 100%; display: block; }
   border-top: 1px solid var(--hairline-soft);
 }
 
+/* The map is a viewport surface, not an article: its header collapses to a
+   single bar so the sky and the briefing share one screen. */
+.page-head.map-head {
+  padding: 6.75rem var(--gutter) 1.5rem;
+}
+.map-head-inner {
+  position: relative;
+  z-index: 2;
+  max-width: var(--shell);
+  margin-inline: auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem 2.5rem;
+  flex-wrap: wrap;
+}
+.map-head-inner h1 {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: clamp(1.7rem, 3.2vw, 2.6rem);
+  line-height: 1.02;
+  letter-spacing: -0.036em;
+  margin: 0.55rem 0 0;
+}
+.map-head-inner h1 em {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  color: var(--ember);
+}
+.map-head-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1.4rem;
+  padding-bottom: 0.35rem;
+}
+.map-head-meta span { white-space: nowrap; }
+
 .reading-room {
   background: var(--bone);
   color: var(--ash);
@@ -1254,7 +1431,7 @@ img { max-width: 100%; display: block; }
   font-size: 1rem;
   line-height: 1.72;
   color: var(--ash-soft);
-  max-width: 68ch;
+  max-width: 72ch;
 }
 
 .entry-actions {
@@ -1280,7 +1457,7 @@ img { max-width: 100%; display: block; }
 .link-out:hover { color: var(--ember-deep); border-color: var(--ember); }
 
 /* Progressive disclosure — the frameworks stay folded until asked for. */
-.frameworks { margin-top: 1.6rem; }
+.frameworks { margin-top: 1.6rem; max-width: 58rem; }
 .frameworks > summary {
   list-style: none;
   cursor: pointer;
@@ -1400,8 +1577,8 @@ img { max-width: 100%; display: block; }
 
 .observatory {
   position: relative;
-  height: min(78svh, 880px);
-  min-height: 30rem;
+  height: calc(100svh - 16rem);
+  min-height: 28rem;
   background:
     radial-gradient(90% 70% at 20% 0%, rgba(22, 41, 94, 0.7), transparent 60%),
     radial-gradient(80% 80% at 85% 100%, rgba(233, 180, 76, 0.1), transparent 60%),
@@ -1415,8 +1592,6 @@ img { max-width: 100%; display: block; }
   stroke: var(--ember);
   filter: drop-shadow(0 0 4px rgba(233, 180, 76, 0.4));
 }
-.observatory .react-flow__arrowhead polyline,
-.observatory .react-flow__arrowhead path { fill: var(--ember); stroke: var(--ember); }
 .observatory .react-flow__controls {
   background: rgba(10, 19, 48, 0.8);
   backdrop-filter: blur(14px);
@@ -1651,7 +1826,7 @@ img { max-width: 100%; display: block; }
 @media (max-width: 860px) {
   .nav-links, .nav-cta { display: none; }
   .nav-burger { display: flex; }
-  .hero { padding-top: 7.5rem; }
+  .hero-stage { padding-top: 7.5rem; }
   .hero-figures { grid-template-columns: repeat(2, 1fr); }
   .hero-figure:nth-child(2) { border-right: 0; }
   .hero-figure:nth-child(-n + 2) { border-bottom: 1px solid var(--hairline-soft); }
@@ -1690,6 +1865,253 @@ img { max-width: 100%; display: block; }
   .foot-legal { justify-content: flex-start; }
 }
 
+/* ============================================================
+   SCROLL — the page answers to the reader, not to a timer
+   ------------------------------------------------------------
+   One vocabulary, borrowed from the Keynote's two builds. Blocks
+   FADE AND MOVE as they arrive; connections DRAW THEMSELVES.
+   Both are scrubbed against the reader's own scroll, so they run
+   forwards when they scroll down and backwards when they scroll
+   back up, and nothing is ever missed by looking away.
+
+   Every element carries its own view() timeline, measured on its
+   own box, so nothing has to be pinned and the page costs no extra
+   scrolling. --i staggers members of a group that would otherwise
+   arrive all at once.
+
+   The whole system is additive: without scroll-timeline support,
+   or for a reader who has asked for less motion, none of it
+   applies and the page renders as plain static markup.
+   ============================================================ */
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    /* --- fade and move --- */
+    /* `translate`, not `transform`: a filled transform animation would
+       outrank .tile:hover's lift, whereas the independent property composes
+       with it. */
+    .reveal,
+    .reveal-group > * {
+      opacity: 0;
+      translate: 0 26px;
+      animation: reveal-rise 1s linear both;
+      animation-timeline: view();
+      animation-range:
+        cover calc(9% + var(--i, 0) * 4%) cover calc(36% + var(--i, 0) * 4%);
+    }
+    .reveal-group > *:nth-child(2) { --i: 1; }
+    .reveal-group > *:nth-child(3) { --i: 2; }
+    .reveal-group > *:nth-child(4) { --i: 3; }
+    .reveal-group > *:nth-child(n + 5) { --i: 4; }
+
+    /* The bento's middle tile is the argument of the section, so it leads
+       and the two quiet tiles settle around it. */
+    .bento > .tile-feature { --i: 0; }
+    .bento > .tile-quiet { --i: 1; }
+
+    /* These sections clip inside themselves, and a clipping box is a scroll
+       container: a view() timeline on anything inside one measures against a
+       box that never scrolls, so it freezes at a constant instead of
+       tracking the page. Each of them therefore publishes a named timeline
+       of its own — resolved against the viewport, where it belongs — and its
+       children animate on that, .split-sky's constellation included. */
+    .hero { view-timeline-name: --hero; }
+    .seam { view-timeline-name: --seam; }
+    .split-visual { view-timeline-name: --map; }
+    .band { view-timeline-name: --band; }
+
+    /* ============================================================
+       THE HERO IS THE DECK
+       ------------------------------------------------------------
+       The Keynote advances on a click. Give the hero a track the
+       better part of two screens longer than itself, pin the stage
+       inside it, and
+       the reader's scroll becomes that click — except that it is
+       continuous and reversible, so a beat half-given stays half-
+       given and scrolling back up un-draws it.
+
+       Every beat below is a slice of one timeline, --hero, over
+       its `contain` range. For a subject taller than the viewport
+       `contain` is precisely the sticky interval: it opens when
+       the track's top edge reaches the top of the viewport, which
+       is when the stage pins, and closes when the track's bottom
+       edge reaches the bottom, which is when it lets go. Beat
+       percentages are therefore percentages of the pin, and they
+       stay correct whatever --build is set to.
+
+         0 –  12   the question is carried off
+         8 –  54   the four linkages draw, one after another
+        16 –  56   eyebrow, headline, subtitle, buttons
+        54 –  68   the figures rule themselves in
+        68 – 100   held, so the last beat can be read
+       ============================================================ */
+
+    .hero { --build: 180vh; }
+
+    /* A phone crosses a viewport in one flick, and the mockup is a 16:9
+       stage squeezed into a portrait frame — the same five beats want less
+       track under them. */
+    @media (max-width: 820px) {
+      .hero { --build: 120vh; }
+    }
+
+    /* Slide 1 is already built when the reader lands — the cards scattered
+       in and the question rose, on the clock, in the second before they
+       touched the wheel. A landing page cannot open on an empty field, and
+       an element cannot take both clocks at once: a scroll animation fills
+       from 0% and would overrule a load animation before it had run. So the
+       first beat is the load, every beat after it is the scroll, and the
+       cards spend the whole pin drifting against it — the one thing on the
+       stage that answers to the scroll continuously rather than in steps.
+
+       `translate`, not `transform`: card-arrive holds the transform, and the
+       independent property composes with it instead of replacing it. */
+    .hero-field rect {
+      animation: card-arrive calc(0.9s * var(--beat)) var(--ease) both, card-drift 1s linear both;
+      animation-delay: calc(var(--i) * 0.09s * var(--beat)), 0s;
+      animation-timeline: auto, --hero;
+      animation-range: normal, contain 0% contain 100%;
+    }
+
+    /* Beat 1 — the question leaves. Keynote's "fade and move character",
+       run backwards by a reader who scrolls back up to re-read it. */
+    .hero-stage > .hero-ask {
+      animation: ask-out 1s linear both;
+      animation-timeline: --hero;
+      animation-range: contain 0% contain 12%;
+    }
+    .hero-stage > .hero-ask > span {
+      display: block;
+      opacity: 0;
+      animation: ask-in calc(0.8s * var(--beat)) var(--ease) calc(0.35s * var(--beat)) forwards;
+    }
+
+    /* Beat 2 — the linkages. Keynote's Line Draw is a dash sweep once
+       pathLength is normalised, and here the sweep is the scroll itself:
+       the line grows out of the centre card at the speed the reader moves.
+       They keep their breathing, which is opacity on its own clock and so
+       composes with the dash rather than fighting it. */
+    .hero-field line {
+      animation:
+        linkage-draw 1s linear both,
+        linkage-breathe 9s ease-in-out infinite;
+      animation-timeline: --hero, auto;
+      animation-range:
+        contain calc(8% + var(--i) * 8%) contain calc(30% + var(--i) * 8%),
+        normal;
+    }
+
+    /* Beat 3 — the headline answers the question, a line at a time. The
+       delays that sequenced these on the clock become ranges on the track;
+       the shorthand resets animation-delay to 0, which is what we want. */
+    .hero-body > * {
+      animation: rise 1s linear both;
+      animation-timeline: --hero;
+    }
+    /* The clock delays have to be cleared here and not in the rule above:
+       they are set per nth-child, which outranks the shorthand's own reset,
+       and a leftover 1.45s against a timeline measured in percent pushes the
+       whole effect off the end of the track. */
+    .hero-body > *:nth-child(1) { animation-delay: 0s; animation-range: contain 16% contain 28%; }
+    .hero-body > *:nth-child(2) { animation-delay: 0s; animation-range: contain 24% contain 38%; }
+    .hero-body > *:nth-child(3) { animation-delay: 0s; animation-range: contain 34% contain 47%; }
+    .hero-body > *:nth-child(4) { animation-delay: 0s; animation-range: contain 43% contain 56%; }
+
+    /* Beat 4 — the figures, last, and the pin then holds for the final third
+       of its length so the finished slide can be read before it is taken
+       away. */
+    .hero-figures {
+      animation: rise 1s linear both;
+      animation-timeline: --hero;
+      animation-range: contain 54% contain 68%;
+    }
+
+    /* --- the hero hands over --- */
+    /* The pin releases when the track's bottom edge meets the bottom of the
+       viewport, which is exactly where `exit` opens — so the stage lifts and
+       dims as it goes rather than simply scrolling off, and the seam arrives
+       over a field that is already receding. The children keep their own
+       animations, so the departure rides on the wrappers instead of the
+       items. */
+    .hero-body,
+    .hero-field {
+      animation: hero-depart 1s linear both;
+      animation-timeline: --hero;
+      animation-range: exit 0% exit 90%;
+    }
+
+    /* --- the marquee runs on the reader --- */
+    .seam-track {
+      animation: slide 1s linear both;
+      animation-timeline: --seam;
+      animation-range: cover 0% cover 100%;
+    }
+
+    /* --- line draw --- */
+    /* The map's constellation is the hero's field again, one section later:
+       the same normalised dash sweep, staggered along the graph. */
+    .split-visual .constellation line {
+      stroke-dasharray: 1;
+      stroke-dashoffset: 1;
+      animation: linkage-draw 1s linear both;
+      animation-timeline: --map;
+      animation-range:
+        cover calc(14% + var(--i) * 2.2%) cover calc(44% + var(--i) * 2.2%);
+    }
+    .split-visual .constellation circle {
+      opacity: 0;
+      animation: star-lit 1s linear both;
+      animation-timeline: --map;
+      animation-range:
+        cover calc(20% + var(--i) * 2.2%) cover calc(40% + var(--i) * 2.2%);
+    }
+
+    /* The brief lands once the graph behind it has begun to draw. */
+    .split-visual > .reveal {
+      animation-timeline: --map;
+      animation-range: cover 34% cover 58%;
+    }
+    .band .reveal-group > * { animation-timeline: --band; }
+
+    /* Each lens row rules itself off as it arrives. */
+    .lens-row { border-bottom-color: transparent; }
+    .lens-row::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -1px;
+      height: 1px;
+      background: var(--hairline-ink);
+      transform: scaleX(0);
+      transform-origin: left;
+      animation: rule-draw 1s linear both;
+      animation-timeline: view();
+      animation-range: cover 12% cover 42%;
+    }
+  }
+}
+
+@keyframes reveal-rise {
+  to { opacity: 1; translate: none; }
+}
+/* The cards hold their arrival transform and take the drift on `translate`,
+   which composes with it. The deeper the card in the stagger the further it
+   travels, so the field opens rather than sliding as one plate. */
+@keyframes card-drift {
+  to { translate: 0 calc(-22px - var(--i) * 9px); }
+}
+/* Also `translate`: .hero-field carries a real transform on phones. */
+@keyframes hero-depart {
+  to { opacity: 0.15; translate: 0 -44px; }
+}
+@keyframes star-lit {
+  to { opacity: 1; }
+}
+@keyframes rule-draw {
+  to { transform: scaleX(1); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1701,5 +2123,337 @@ img { max-width: 100%; display: block; }
   }
   .hero-body > *,
   .hero-figures,
-  .overlay-menu li { opacity: 1; transform: none; }
+  .hero-field rect,
+  .hero-field line,
+  .overlay-menu li {
+    opacity: 1;
+    transform: none;
+    animation-delay: 0s !important;
+  }
+  .hero-field line { stroke-dashoffset: 0; }
+  /* The question is a motion beat and nothing else, so it simply never
+     appears rather than flashing over the headline. */
+  .hero-stage > .hero-ask { display: none; }
+  /* The reveal system never applies here, so nothing needs unhiding — but
+     the marquee's own infinite slide is collapsed by the rule above, which
+     is the intent: it simply holds still. */
+  .seam-track { transform: none; }
 }
+
+/* ============================================================
+   ADMIN — the observatory floor
+
+   Night palette throughout. The public pages alternate between bone
+   and night; a control surface should never be mistaken for either,
+   so this one stays dark and keeps its own rhythm.
+   ============================================================ */
+
+.admin {
+  min-height: 100vh;
+  background: var(--ink);
+  color: var(--bright);
+}
+
+.admin-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(5, 7, 15, 0.86);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--hairline);
+}
+.admin-bar-inner {
+  max-width: var(--shell);
+  margin-inline: auto;
+  padding: 1rem var(--gutter);
+  display: flex;
+  align-items: center;
+  gap: clamp(1rem, 4vw, 2.5rem);
+  flex-wrap: wrap;
+}
+.admin-identity { margin-right: auto; }
+.admin-who { color: var(--haze); margin: 0.15rem 0 0; }
+
+.admin-tabs { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.admin-tab {
+  padding: 0.5rem 1rem;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--haze);
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: color var(--t-fast), border-color var(--t-fast), background var(--t-fast);
+}
+.admin-tab:hover {
+  color: var(--ember-lit);
+  border-color: rgba(233, 180, 76, 0.4);
+  background: rgba(233, 180, 76, 0.06);
+}
+.admin-signout { padding: 0.55rem 1.1rem; font-size: 0.78rem; }
+
+.admin-body {
+  max-width: var(--shell);
+  margin-inline: auto;
+  padding: clamp(2rem, 6vw, 4rem) var(--gutter) 6rem;
+}
+
+.admin-head { margin-bottom: clamp(2rem, 5vw, 3rem); }
+.admin-head h1 {
+  font-family: var(--font-sans);
+  font-size: clamp(2rem, 5vw, 3.1rem);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  margin: 0 0 0.9rem;
+}
+.admin-head h1 em {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  color: var(--ember);
+}
+.admin-lede {
+  color: var(--haze);
+  max-width: 62ch;
+  line-height: 1.75;
+  font-size: 0.95rem;
+  margin: 0 0 1.4rem;
+}
+.admin-lede code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--ember-lit);
+}
+
+/* --- health --- */
+
+/* Cell separators are borders on the cells, not a background showing through a
+   1px gap. Eight stats in a five-column grid leaves two empty cells, and with
+   the gap trick those rendered as a pale block in the corner -- the separator
+   colour filling a whole cell instead of a hairline. */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  background: var(--ink-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  margin-bottom: clamp(2rem, 5vw, 3rem);
+}
+.stat {
+  background: var(--ink-2);
+  padding: 1.4rem 1.5rem;
+  border-right: 1px solid var(--hairline-soft);
+  border-bottom: 1px solid var(--hairline-soft);
+}
+.stat-label { color: var(--haze-dim); margin: 0 0 0.6rem; }
+.stat-value {
+  font-family: var(--font-sans);
+  font-size: 2rem;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  margin: 0;
+  line-height: 1;
+}
+.stat-note { color: var(--haze-dim); font-size: 0.78rem; margin: 0.5rem 0 0; line-height: 1.5; }
+.stat-warn .stat-value { color: var(--ember); }
+.stat-bad .stat-value { color: #ff8f6b; }
+
+.admin-panel {
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  padding: clamp(1.4rem, 3vw, 2rem);
+  background: var(--ink-2);
+}
+.admin-panel-title {
+  font-family: var(--font-sans);
+  font-size: 1.1rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.5rem;
+}
+.admin-panel-note {
+  color: var(--haze-dim);
+  font-size: 0.85rem;
+  line-height: 1.65;
+  margin: 0 0 1.5rem;
+  max-width: 62ch;
+}
+.admin-empty { color: var(--haze-dim); font-size: 0.9rem; margin: 0; }
+
+.histogram { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.55rem; }
+.histogram-row { display: grid; grid-template-columns: 3rem 1fr auto; align-items: center; gap: 1rem; }
+.histogram-label { color: var(--haze); }
+.histogram-track {
+  height: 10px;
+  background: rgba(246, 244, 239, 0.05);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+}
+.histogram-bar {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--ember-deep), var(--ember));
+  border-radius: var(--r-pill);
+  min-width: 3px;
+}
+.histogram-bar-under { background: rgba(139, 153, 188, 0.35); }
+.histogram-count { color: var(--haze-dim); white-space: nowrap; }
+
+/* --- linkage curation --- */
+
+.linkage-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 1rem; }
+.linkage {
+  border: 1px solid var(--hairline);
+  border-left: 2px solid var(--hairline);
+  border-radius: var(--r-md);
+  padding: 1.3rem 1.5rem;
+  background: var(--ink-2);
+}
+.linkage-drawn { border-left-color: var(--ember); }
+.linkage-hidden { border-left-color: var(--haze-dim); }
+.linkage-retired { border-left-color: rgba(246, 244, 239, 0.1); opacity: 0.62; }
+
+.linkage-head { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.8rem; }
+.linkage-status { letter-spacing: 0.06em; text-transform: uppercase; }
+.linkage-status-drawn { color: var(--ember); }
+.linkage-status-hidden { color: var(--haze); }
+.linkage-status-retired { color: var(--haze-dim); }
+.linkage-meta { color: var(--haze-dim); }
+
+.linkage-pair {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin: 0 0 0.7rem;
+  font-size: 1rem;
+  line-height: 1.45;
+}
+.linkage-node { flex: 1 1 240px; }
+.linkage-arrow { color: var(--ember); flex: 0 0 auto; }
+.linkage-why { color: var(--haze); font-size: 0.88rem; line-height: 1.65; margin: 0 0 1.1rem; max-width: 70ch; }
+.linkage-why-absent { font-style: italic; color: var(--haze-dim); }
+
+.linkage-controls { display: flex; gap: 0.8rem; align-items: center; flex-wrap: wrap; }
+.linkage-strength { display: flex; align-items: center; gap: 0.6rem; }
+.linkage-strength label { color: var(--haze-dim); }
+
+/* --- inputs --- */
+
+.admin-input {
+  background: rgba(246, 244, 239, 0.04);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-sm);
+  color: var(--bright);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  padding: 0.6rem 0.8rem;
+  transition: border-color var(--t-fast);
+}
+.admin-input:focus-visible { outline: none; border-color: var(--ember); }
+.admin-input-num { width: 6.5rem; }
+.admin-textarea {
+  width: 100%;
+  font-family: var(--font-sans);
+  font-size: 0.92rem;
+  line-height: 1.65;
+  resize: vertical;
+}
+
+.admin-error { color: #ff8f6b; font-size: 0.82rem; margin: 0.7rem 0 0; }
+.admin-ok { color: var(--ember); }
+
+/* --- article corrections --- */
+
+.admin-article-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
+.admin-article { border: 1px solid var(--hairline); border-radius: var(--r-md); background: var(--ink-2); overflow: hidden; }
+.admin-article-gap { border-color: rgba(233, 180, 76, 0.28); }
+.admin-article-head {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+  padding: 1.1rem 1.4rem;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.admin-article-head:hover { background: rgba(246, 244, 239, 0.02); }
+.admin-article-title { font-size: 0.98rem; line-height: 1.45; flex: 1 1 320px; }
+.admin-article-meta { color: var(--haze-dim); }
+.admin-article-body { padding: 0 1.4rem 1.5rem; display: grid; gap: 1.6rem; }
+
+.admin-field { display: grid; gap: 0.55rem; }
+.admin-field label { color: var(--haze-dim); }
+.admin-field-foot { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+
+/* --- tuning --- */
+
+.setting-list { display: grid; gap: 1rem; }
+.setting {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1.5rem;
+  align-items: start;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  padding: 1.4rem 1.5rem;
+  background: var(--ink-2);
+}
+.setting-key { color: var(--ember); display: block; margin-bottom: 0.5rem; }
+.setting-desc { color: var(--haze); font-size: 0.86rem; line-height: 1.65; margin: 0 0 0.6rem; max-width: 68ch; }
+.setting-stamp { color: var(--haze-dim); margin: 0; }
+.setting-control { display: flex; gap: 0.6rem; align-items: center; }
+.setting-feedback { grid-column: 1 / -1; margin: 0.4rem 0 0; }
+
+@media (max-width: 620px) {
+  .setting { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   AUTH — the door
+   ============================================================ */
+
+.auth {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 6rem var(--gutter) 4rem;
+  background: var(--ink);
+}
+.auth-card {
+  max-width: 46ch;
+  text-align: center;
+  color: var(--bright);
+}
+.auth-title {
+  font-family: var(--font-sans);
+  font-size: clamp(2rem, 6vw, 2.9rem);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  margin: 0.8rem 0 1rem;
+}
+.auth-title em { font-family: var(--font-display); font-style: italic; font-weight: 400; color: var(--ember); }
+.auth-body { color: var(--haze); line-height: 1.75; font-size: 0.95rem; margin: 0 0 1.8rem; }
+.auth-error {
+  color: #ff8f6b;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  border: 1px solid rgba(255, 143, 107, 0.3);
+  border-radius: var(--r-sm);
+  padding: 0.8rem 1rem;
+  margin: 0 0 1.4rem;
+}
+.auth-btn { justify-content: center; }
+.auth-btn-mark { width: 1.05em; height: 1.05em; }
+.auth-foot { color: var(--haze-dim); margin: 1.6rem 0 0; }

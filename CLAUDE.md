@@ -12,8 +12,9 @@ When the user shares code for review or inspection:
 ## Project
 
 Noctra is a Decision Engine on **Next.js (App Router) + Supabase**, deployed on Vercel's free tier.
-Three pages — **Apercu** (news analysis), **Catographic** (event-relationship graph), and
-**Enchufar** (drag-and-drop analysis workspace, not yet built).
+Three public pages — **Apercu** (news analysis), **Catographic** (event-relationship graph), and
+**Enchufar** (drag-and-drop analysis workspace, not yet built) — plus **/admin**, a private
+observatory floor for pipeline health, linkage curation, article corrections and graph tuning.
 
 ## Architecture
 
@@ -40,10 +41,33 @@ Supabase project `rgcdkmilchxbchpotsrs`. Schema lives in `supabase/migrations/`.
 Two RPCs: `match_articles(...)` for vector candidate search, `get_graph(p_days, p_node_limit)`
 which returns React-Flow-shaped `{nodes, edges}` in one round trip.
 
-**RLS is enabled with public-SELECT-only policies.** There are no insert/update/delete policies —
-writes are possible solely with the service role key, which bypasses RLS. **Never expose that key to
-the Next.js app.** The pipeline loads it from `pipeline/.env`, which is gitignored. GitHub Actions
-receives it as a secret. The .env.local and root .env files must never contain `SUPABASE_SERVICE_ROLE_KEY`.
+### Roles
+
+Three roles, enforced by **grants first, RLS second** — the policy is never the only lock.
+
+| Role | Who | May |
+|---|---|---|
+| `anon` | the public, browser bundle | `SELECT` only. No INSERT/UPDATE/DELETE/TRUNCATE grant at all |
+| `pipeline_writer` | the Python pipeline | `SELECT` + `INSERT`, column-scoped `UPDATE` on articles/insights. **No UPDATE on linkages, no DELETE anywhere** |
+| `authenticated` + `is_admin()` | the admin | `SELECT` + `INSERT` + `UPDATE`. **No DELETE** |
+
+**Nothing deletes through the API.** `DELETE` and `TRUNCATE` are revoked from every API role,
+including `service_role`. Retiring a linkage is `is_linked = false`, which keeps the model's
+verdict on the record — and stops `discover_linkages.py` re-paying for a verdict it already has.
+Destructive cleanup is a SQL-editor act under the `postgres` role.
+
+`pipeline_writer` is a real Postgres role, not an API key tier. PostgREST reads the `role` claim of
+the request JWT and `SET ROLE`s to it, so the pipeline sends `apiKey: <anon>` (gateway admission)
+plus `Authorization: Bearer <pipeline token>` (actual authority). **The service-role key is no longer
+used anywhere** — it bypassed RLS entirely, which the pipeline never needed.
+
+Admin is a row in `public.user_roles`, checked by the SECURITY DEFINER `is_admin()`. It is not a
+claim the client can assert, and there is no API path that writes that table — granting admin is a
+SQL-editor act. Signing in with GitHub grants nothing on its own.
+
+`get_pipeline_health()` and `get_admin_linkages()` are SECURITY DEFINER and each open with an
+`is_admin()` guard. Supabase's linter flags them as callable by `authenticated`; that is intentional
+and the guard is the reason it is safe.
 
 Free-tier Supabase projects **pause after ~7 days idle**; the hourly pipeline keeps it awake.
 
@@ -58,11 +82,19 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=...     # anon key only — this reaches the brows
 `pipeline/.env` for the Python pipeline (gitignored, never committed):
 ```
 SUPABASE_URL=https://rgcdkmilchxbchpotsrs.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=...         # service role key — bypasses RLS
+SUPABASE_ANON_KEY=...                 # gateway apiKey only, carries no authority
+SUPABASE_PIPELINE_TOKEN=...           # JWT for the pipeline_writer role
 OPENAI_API_KEY=...
 ```
 
-GitHub Actions secrets for scheduled runs: same three as `pipeline/.env`. Never prefix these `NEXT_PUBLIC_`.
+GitHub Actions secrets for scheduled runs: same four as `pipeline/.env`. Never prefix these `NEXT_PUBLIC_`.
+
+Mint the pipeline token once, **locally, never in CI**:
+```bash
+SUPABASE_JWT_SECRET=... python pipeline/mint_pipeline_token.py --years 5
+```
+CI holds the *token*, never `SUPABASE_JWT_SECRET`. The secret can mint a `service_role` token, so a
+leak of it is a full compromise; a leak of the token is a role that cannot delete a single row.
 
 ## Running
 
@@ -124,5 +156,15 @@ the design board and have been verified with a live completion call: `gpt-5.4-mi
 - **Positions are computed client-side** with dagre, keeping `get_graph` pure data.
 - **Pages degrade rather than fail** — an unreachable Supabase renders an empty state, so a deploy
   during an outage does not take the site down.
-- **Auth is deferred.** The free/paid limit is `FREE_TIER_NODE_LIMIT` in `lib/config.ts`; when
-  accounts land it becomes a user lookup and nothing else changes.
+- **Auth exists for admin only.** GitHub OAuth via `@supabase/ssr`, cookie sessions. Public pages
+  stay session-less and prerendered — binding them to a visitor's cookies would make them
+  uncacheable for no gain. The free/paid limit is still a constant, now read from `settings`.
+- **The admin gate is checked three times, on purpose.** `proxy.ts` redirects (convenience only —
+  Next.js middleware has been bypassable, CVE-2025-29927), `app/admin/layout.tsx` re-checks
+  server-side, and RLS re-checks `is_admin()` in the database. Server Actions each call
+  `requireAdmin()` themselves, because an action is a public POST endpoint reachable without ever
+  rendering the page that contains it.
+- **Graph tunables live in `public.settings`, not code.** `MIN_LINK_STRENGTH` and
+  `GRAPH_WINDOW_DAYS` each blanked a public page once, and both needed a deploy to fix while the
+  page sat empty. `lib/config.ts` keeps the reasoning and is now the *fallback* — if the settings
+  read fails, the constants still render a page.

@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import { Archivo, Instrument_Serif, JetBrains_Mono } from "next/font/google";
-import Nav from "@/components/Nav";
-import Footer from "@/components/Footer";
 import "./globals.css";
 
 /* Archivo carries the interface and the headline mass; Instrument Serif is the
@@ -36,17 +34,29 @@ export const metadata: Metadata = {
   },
   description:
     "Noctra reads the day's business news, dissects each story through PESTEL, SWOT, Porter and Diamond-E, then maps how one event drives the next.",
-  icons: { icon: "/favicon.svg" },
+  /* The mark is hand-drawn artwork, so it ships as raster at fixed sizes
+     rather than SVG. The .ico carries 16/32/48 for the tab and the legacy
+     Windows path; the PNGs cover high-DPI tabs and the iOS home screen. */
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "16x16 32x32 48x48" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/icon.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: { url: "/apple-icon.png", sizes: "180x180" },
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className={`${archivo.variable} ${instrument.variable} ${jetbrains.variable}`}>
-        <Nav />
-        <main>{children}</main>
-        <Footer />
-      </body>
+    /* The font variables must live on <html>, not <body>: --font-sans is
+       composed on :root, and a var() there can only see custom properties
+       declared at that same element. */
+    /* Document shell only. The public nav and footer belong to the (site)
+       route group -- /admin and /login bring their own chrome and must not
+       inherit a fixed-position nav that would sit on top of it. */
+    <html lang="en" className={`${archivo.variable} ${instrument.variable} ${jetbrains.variable}`}>
+      <body>{children}</body>
     </html>
   );
 }

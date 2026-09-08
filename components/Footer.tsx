@@ -74,12 +74,16 @@ export default function Footer() {
 
       {/* The wordmark at poster scale, outlined so it reads as texture. */}
       <div className="foot-mark" aria-hidden="true">
-        <span>Noctra</span>
+        <svg viewBox="0 0 1000 372" preserveAspectRatio="xMidYMid meet">
+          <text x="500" y="330" textAnchor="middle" textLength="980" lengthAdjust="spacingAndGlyphs">
+            Noctra
+          </text>
+        </svg>
       </div>
 
       <div className="foot-legal">
         <p className="mono-meta" style={{ margin: 0 }}>
-          © {new Date().getFullYear()} Noctra — built by Chin Wong
+          © {new Date().getFullYear()} Noctra — built by Hercules
         </p>
         <p className="mono-meta" style={{ margin: 0 }}>
           Analysis is AI-generated · verify before you rely on it

@@ -9,15 +9,37 @@ function formatDate(value: string | null) {
   });
 }
 
+/* The model returns its categories in whatever order the JSON happened to
+   serialise, which put Threats before Strengths. Each framework has a reading
+   order, and the quadrant accent colours key off position -- so sort first. */
+const CANONICAL: Record<string, string[]> = {
+  swot: ["strengths", "weaknesses", "opportunities", "threats"],
+  pest: ["political", "economic", "social", "technological", "environmental", "legal"],
+  diamond: ["environment", "resources", "management_preferences", "organisation", "strategy"],
+};
+
+function rank(order: string[], key: string) {
+  const index = order.indexOf(key.toLowerCase().replace(/[\s-]/g, "_"));
+  return index === -1 ? order.length : index;
+}
+
 /* Each framework renders as a quadrant field rather than a stack of headings:
    SWOT is four boxes because it *is* four boxes, and PEST and Diamond-E read
    the same way once their categories are given equal weight. */
-function Framework({ title, data }: { title: string; data?: AnalysisSection }) {
+function Framework({
+  title,
+  order,
+  data,
+}: {
+  title: string;
+  order: string[];
+  data?: AnalysisSection;
+}) {
   if (!data || typeof data !== "object") return null;
 
-  const entries = Object.entries(data).filter(
-    ([, items]) => Array.isArray(items) && items.length > 0
-  );
+  const entries = Object.entries(data)
+    .filter(([, items]) => Array.isArray(items) && items.length > 0)
+    .sort(([a], [b]) => rank(order, a) - rank(order, b) || a.localeCompare(b));
   if (entries.length === 0) return null;
 
   return (
@@ -70,9 +92,13 @@ export default function ArticleCard({ article, index }: { article: Article; inde
               </svg>
             </summary>
 
-            <Framework title="SWOT — the position" data={summary?.swot_analysis} />
-            <Framework title="PEST — the weather" data={summary?.pest_analysis} />
-            <Framework title="Diamond-E — the fit" data={summary?.diamond_e_analysis} />
+            <Framework title="SWOT — the position" order={CANONICAL.swot} data={summary?.swot_analysis} />
+            <Framework title="PEST — the weather" order={CANONICAL.pest} data={summary?.pest_analysis} />
+            <Framework
+              title="Diamond-E — the fit"
+              order={CANONICAL.diamond}
+              data={summary?.diamond_e_analysis}
+            />
           </details>
         )}
 

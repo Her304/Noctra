@@ -9,6 +9,7 @@
     "types": "supabase gen types typescript --linked > lib/database.types.ts"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.6",
     "@supabase/supabase-js": "^2.112.4",
     "@types/d3-force": "^3.0.10",
     "@xyflow/react": "^12.11.6",

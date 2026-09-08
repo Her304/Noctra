@@ -50,7 +50,8 @@ function Canvas({ graph }: { graph: Graph }) {
           source: item.source,
           target: item.target,
           data: item.data,
-          markerEnd: { type: MarkerType.ArrowClosed },
+          // React Flow writes the arrowhead colour inline, so CSS cannot reach it.
+          markerEnd: { type: MarkerType.ArrowClosed, color: "#E9B44C", width: 16, height: 16 },
           style: {
             strokeWidth: 1 + strength * 3,
             opacity: 0.3 + strength * 0.7,
@@ -156,7 +157,13 @@ function Canvas({ graph }: { graph: Graph }) {
             setEdgeDetail(null);
           }}
           fitView
-          fitViewOptions={{ padding: 0.3 }}
+          // The briefing panel is an absolute overlay on the right of the very
+          // box React Flow fits into, so uniform padding parks the outermost
+          // cluster underneath it. Reserve the panel's own width instead:
+          // 24rem plus its 1.25rem inset, rounded up for breathing room.
+          fitViewOptions={{
+            padding: { top: "48px", right: "424px", bottom: "48px", left: "48px" },
+          }}
           minZoom={0.1}
           maxZoom={2}
           proOptions={{ hideAttribution: false }}

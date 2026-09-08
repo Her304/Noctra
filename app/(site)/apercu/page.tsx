@@ -1,6 +1,6 @@
 import ArticleCard from "@/components/ArticleCard";
-import { APERCU_WINDOW_DAYS } from "@/lib/config";
 import { getRecentArticles } from "@/lib/queries";
+import { getSettings } from "@/lib/settings";
 import type { Article } from "@/lib/types";
 
 export const metadata = { title: "Apercu" };
@@ -12,10 +12,14 @@ export default async function ApercuPage() {
   let articles: Article[] = [];
   let failed = false;
 
+  // Falls back to the lib/config.ts constant if the settings row is
+  // unreachable, so the window is never undefined.
+  const { apercuWindowDays } = await getSettings();
+
   // A paused or unreachable Supabase must not fail the whole build, or a
   // deploy during an outage would take the site down with it.
   try {
-    articles = await getRecentArticles();
+    articles = await getRecentArticles(apercuWindowDays);
   } catch (error) {
     console.error(error);
     failed = true;
@@ -31,13 +35,13 @@ export default async function ApercuPage() {
             The week, <em>read</em> through strategy.
           </h1>
           <p>
-            Every story of the past {APERCU_WINDOW_DAYS} days, dissected through SWOT, PEST and
+            Every story of the past {apercuWindowDays} days, dissected through SWOT, PEST and
             Diamond-E. The deck is the argument; open the analysis for the working.
           </p>
 
           <div className="page-head-meta">
             <span className="mono-meta">Source · CNBC</span>
-            <span className="mono-meta">Window · {APERCU_WINDOW_DAYS} days</span>
+            <span className="mono-meta">Window · {apercuWindowDays} days</span>
             <span className="mono-meta">
               {failed ? "Status · unreachable" : `Stories · ${articles.length}`}
             </span>
@@ -59,7 +63,7 @@ export default async function ApercuPage() {
             <div className="empty-state">
               <h2>Nothing analysed yet</h2>
               <p>
-                No analysed articles in the past {APERCU_WINDOW_DAYS} days. The pipeline runs
+                No analysed articles in the past {apercuWindowDays} days. The pipeline runs
                 hourly — check back shortly.
               </p>
             </div>

@@ -15,6 +15,12 @@ from itertools import islice
 
 from common import LINKAGE_MODEL, openai, reasoning_kwargs, supabase
 
+# The score is the only tunable the app has -- lib/config.ts gates the graph on
+# MIN_LINK_STRENGTH -- so it has to spread. An earlier version named 0.35 as the
+# first example value and got 7 of 9 accepted links back at exactly 0.35: the
+# model anchored on the lowest acceptable number rather than scoring the case.
+# Scoring off three observable properties of the channel, with no single salient
+# example number, makes the score a function of the pair instead of a hedge.
 VERIFY_PROMPT = """You are mapping causal relationships between business news events.
 
 EVENT A: {title_a}
@@ -42,19 +48,59 @@ DOES NOT COUNT
 Name the transmission channel explicitly: what moves, in which direction, reaching
 whom. If you cannot state that channel in one sentence, it is not a link.
 
+SCORING
+Settle three properties of the channel before you score, and report each one:
+
+  steps      1 -- the cause lands directly on the other party.
+             2 -- it moves one shared driver, which then moves the other party.
+             3 -- it needs a chain of drivers, any of which could absorb the shock.
+  magnitude  "material"  -- large enough to show up in the affected party's costs,
+                            revenue, volumes, or valuation.
+             "marginal"  -- direction is right, but the size is trivial or swamped
+                            by drivers that have nothing to do with this event.
+  support    "stated"    -- one of the two articles names this mechanism itself.
+             "inferred"  -- you are supplying the mechanism from background knowledge.
+
+Then read the score off those three properties:
+
+  0.85-1.00  1-2 steps, material, and an article names the mechanism.
+  0.65-0.84  1-2 steps, material, inferred. A clean second-order channel through a
+             shared driver belongs here.
+  0.45-0.64  3 steps and material; or 1-2 steps where the effect is real but modest.
+  0.30-0.44  The channel holds, but the effect is marginal for the affected party.
+  0.15-0.29  A channel you can name but not defend: the shared driver has other,
+             larger inputs that dominate whatever this event does to it.
+  0.00-0.14  No channel at all. Sector adjacency, shared upstream cause, or
+             "both reflect the wider economy".
+
+Steps are not a penalty. Finding the shared driver is the point of this exercise:
+oil prices rising, reaching a tyre maker through input costs, is a 2-step channel
+and a strong link, not a weak one. Discount for steps only when each extra hop adds
+somewhere the shock can be absorbed before it arrives. Magnitude is the real
+discriminator -- ask how much of the affected party's costs or revenue this actually
+moves. "inferred" is the normal case, since these articles were written
+independently and rarely reference each other; it is not itself a mark against a link.
+
+Set linked to true when strength reaches 0.30, false below it.
+
+The score carries real information, so spend the range. Do not park on the edge of a
+band: 0.35 and 0.40 are not defaults. If you find yourself reaching for one, the
+question you have not yet answered is whether the effect is material or marginal for
+the receiving party -- settle that and score what you settled. Two pairs whose causal
+cases differ must not come back with the same number. Score rejected pairs on this
+same table: a near-miss at 0.25 has to stay distinguishable from a non-starter at 0.05.
+
 Respond with JSON in exactly this shape:
 {{
+  "steps": 1, 2 or 3,
+  "magnitude": "material" or "marginal",
+  "support": "stated" or "inferred",
   "linked": true or false,
   "cause": "A" or "B",
   "strength": 0.0 to 1.0,
   "directness": "direct" or "second-order",
   "explanation": "the transmission channel, in one sentence"
-}}
-
-ALWAYS score strength on the merits of the causal case, including when linked is
-false. 0.35 means "arguable but weak", 0.6 "solid", 0.85 "hard to dispute". Do not
-default rejected pairs to 0.0 -- the score is how the pipeline is calibrated, so a
-near-miss must be distinguishable from a non-starter."""
+}}"""
 
 
 def parse_embedding(value):
