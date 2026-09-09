@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Archivo, Instrument_Serif, JetBrains_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 /* Archivo carries the interface and the headline mass; Instrument Serif is the
@@ -56,7 +57,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
        route group -- /admin and /login bring their own chrome and must not
        inherit a fixed-position nav that would sit on top of it. */
     <html lang="en" className={`${archivo.variable} ${instrument.variable} ${jetbrains.variable}`}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }
