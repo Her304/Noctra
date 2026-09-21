@@ -1,11 +1,21 @@
+# macOS
 .DS_Store
-.env
-venv/
 
-start_local.sh
+# Environment files (keep the example template)
+.env*
+!.env.example
+
+# Python virtual environments
+venv/
+.venv*/
+
+# Python cache
 __pycache__/
 *.pyc
-# Next.js
+*.pyo
+*.egg-info/
+
+# Next.js build output
 node_modules/
 .next/
 out/
@@ -13,12 +23,32 @@ next-env.d.ts
 .vercel
 *.tsbuildinfo
 
-# Local env
-.env.local
+# Logs
+*.log
+npm-debug.log*
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude Code local files
+.claude/
+
+# Coverage / test artifacts
+coverage/
+.coveragexml
+
+# Local databases
+*.sqlite3
+db.sqlite3
 
 # Pipeline secrets
 pipeline/.env
-.venv-pipeline/
 
-# Claude Code worktrees (embedded repos, must not be tracked)
-.claude/worktrees/
+# Superseded legacy files (to be removed once Next.js stack is fully verified live)
+# start_local.sh
+# Dockerfile
+# docker-compose.yml
+# requirements.txt
